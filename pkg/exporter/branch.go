@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -127,6 +128,9 @@ func (c *BranchCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 
 			for _, branch := range branches {
+
+				lastCommit[fmt.Sprintf("%s-%s", repo, branch.GetName())] =
+
 				labels := []string{
 					owner,
 					record.GetName(),
