@@ -149,6 +149,19 @@ func handler(cfg *config.Config, db store.Store, logger *slog.Logger, client *gi
 		))
 	}
 
+	if cfg.Collector.Branches {
+		logger.Debug("Default Branches collector registered")
+
+		registry.MustRegister(exporter.NewBranchCollector(
+			logger,
+			client,
+			db,
+			requestFailures,
+			requestDuration,
+			cfg.Target,
+		))
+	}
+
 	if cfg.Collector.Billing {
 		logger.Debug("Billing collector registered")
 

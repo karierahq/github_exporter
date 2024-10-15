@@ -64,6 +64,7 @@ type Collector struct {
 	Admin     bool
 	Orgs      bool
 	Repos     bool
+	Branches  bool
 	Billing   bool
 	Workflows bool
 	Runners   bool

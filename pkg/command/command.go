@@ -285,6 +285,13 @@ func RootFlags(cfg *config.Config) []cli.Flag {
 			Destination: &cfg.Collector.Repos,
 		},
 		&cli.BoolFlag{
+			Name:        "collector.branches",
+			Value:       true,
+			Usage:       "Enable collector for branches",
+			EnvVars:     []string{"GITHUB_EXPORTER_COLLECTOR_BRANCHES"},
+			Destination: &cfg.Collector.Branches,
+		},
+		&cli.BoolFlag{
 			Name:        "collector.billing",
 			Value:       false,
 			Usage:       "Enable collector for billing",

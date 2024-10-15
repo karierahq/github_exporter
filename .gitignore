@@ -1,5 +1,6 @@
 .direnv
 .devenv
+.idea
 coverage.out
 
 /bin

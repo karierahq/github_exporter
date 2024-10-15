@@ -83,3 +83,51 @@ func reposByOwnerAndName(ctx context.Context, client *github.Client, owner, repo
 		res,
 	}, nil
 }
+
+func branchByOwnerRepoAndName(ctx context.Context, client *github.Client, owner, repo string, branch string) ([]*github.Branch, error) {
+	if strings.Contains(repo, "*") {
+
+		var (
+			branches []*github.Branch
+		)
+
+		for {
+			result, resp, err := client.Repositories.GetBranch(
+				ctx,
+				fmt.Sprintf("user:%s", owner),
+				fmt.Sprintf("repo:%s", repo),
+				fmt.Sprintf("user:%s", branch),
+				0,
+			)
+
+			if err != nil {
+				closeBody(resp)
+				return nil, err
+			}
+
+			branches = append(
+				branches,
+				result,
+			)
+
+			if resp.NextPage == 0 {
+				closeBody(resp)
+				break
+			}
+
+			closeBody(resp)
+		}
+
+		return branches, nil
+	}
+
+	res, _, err := client.Repositories.GetBranch(ctx, owner, repo, branch, 0)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return []*github.Branch{
+		res,
+	}, nil
+}
