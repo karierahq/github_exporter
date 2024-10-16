@@ -22,8 +22,8 @@ type BranchCollector struct {
 	duration *prometheus.HistogramVec
 	config   config.Target
 
-	Protected   *prometheus.Desc
-	LastUpdated *prometheus.Desc
+	Protected    *prometheus.Desc
+	TotalCommits *prometheus.Desc
 }
 
 // NewBranchCollector returns a new BranchCollector.
@@ -47,8 +47,8 @@ func NewBranchCollector(logger *slog.Logger, client *github.Client, db store.Sto
 			labels,
 			nil,
 		),
-		LastUpdated: prometheus.NewDesc(
-			"github_repo_branch_last_updated",
+		TotalCommits: prometheus.NewDesc(
+			"github_repo_branch_total_commits",
 			"Aasdadasdasd",
 			labels,
 			nil,
@@ -60,17 +60,18 @@ func NewBranchCollector(logger *slog.Logger, client *github.Client, db store.Sto
 func (c *BranchCollector) Metrics() []*prometheus.Desc {
 	return []*prometheus.Desc{
 		c.Protected,
-		c.LastUpdated,
+		c.TotalCommits,
 	}
 }
 
 // Describe sends the super-set of all possible descriptors of metrics collected by this Collector.
 func (c *BranchCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.Protected
-	ch <- c.LastUpdated
+	ch <- c.TotalCommits
 }
 
-var lastCommit map[string]
+var TotalCommitsMap map[string]int
+
 // branch name
 // commit timestamp
 // count
@@ -129,14 +130,19 @@ func (c *BranchCollector) Collect(ch chan<- prometheus.Metric) {
 
 			for _, branch := range branches {
 
-				lastCommit[fmt.Sprintf("%s-%s", repo, branch.GetName())] =
+				key := fmt.Sprintf("%s-%s", repo, branch.GetName())
+
+				if val, ok := TotalCommitsMap[key]; ok && val == *branch.Commit.Stats.Total {
+					// No change, do nothing
+					continue
+				}
+				TotalCommitsMap[key] = *branch.Commit.Stats.Total
 
 				labels := []string{
 					owner,
 					record.GetName(),
 					branch.GetName(),
-					branch.Commit.Commit.Author.GetDate().String(),
-					branch.Commit.GetStats().Total
+					string(rune(TotalCommitsMap[key])),
 				}
 
 				ch <- prometheus.MustNewConstMetric(
@@ -147,9 +153,9 @@ func (c *BranchCollector) Collect(ch chan<- prometheus.Metric) {
 				)
 
 				ch <- prometheus.MustNewConstMetric(
-					c.LastUpdated,
+					c.TotalCommits,
 					prometheus.GaugeValue,
-					float64(branch.Commit.Commit.Author.GetDate().Unix()),
+					float64(TotalCommitsMap[key]),
 					labels...,
 				)
 			}
