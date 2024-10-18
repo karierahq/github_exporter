@@ -131,3 +131,49 @@ func branchByOwnerRepoAndName(ctx context.Context, client *github.Client, owner,
 		res,
 	}, nil
 }
+
+func getCommitsBetweenSHAs(ctx context.Context, client *github.Client, owner, repo, shaStart, shaEnd string) (int, error) {
+
+	// Fetch the commit corresponding to the starting SHA to get its timestamp
+	commitStart, _, err := client.Repositories.GetCommit(ctx, owner, repo, shaStart, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	// Fetch the commit corresponding to the ending SHA to get its timestamp
+	commitEnd, _, err := client.Repositories.GetCommit(ctx, owner, repo, shaEnd, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	// Use the commit timestamps to filter commits between these two SHAs
+	opt := &github.CommitsListOptions{
+		Since: commitStart.GetCommit().GetCommitter().GetDate().Time,
+		Until: commitEnd.GetCommit().GetCommitter().GetDate().Time,
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+	}
+
+	totalCommits := 0
+
+	// Loop through paginated results and count commits
+	for {
+		commits, resp, err := client.Repositories.ListCommits(ctx, owner, repo, opt)
+		if err != nil {
+			return 0, err
+		}
+
+		totalCommits += len(commits)
+
+		// Check if there are more pages of commits
+		if resp.NextPage == 0 {
+			break
+		}
+
+		// Move to the next page
+		opt.Page = resp.NextPage
+	}
+
+	return totalCommits, nil
+}

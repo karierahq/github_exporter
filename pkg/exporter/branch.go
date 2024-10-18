@@ -32,7 +32,7 @@ func NewBranchCollector(logger *slog.Logger, client *github.Client, db store.Sto
 		failures.WithLabelValues("branch").Add(0)
 	}
 
-	labels := []string{"owner", "repo", "branch", "last_updated"}
+	labels := []string{"owner", "repo", "branch"}
 	return &BranchCollector{
 		client:   client,
 		logger:   logger.With("collector", "branch"),
@@ -43,13 +43,13 @@ func NewBranchCollector(logger *slog.Logger, client *github.Client, db store.Sto
 
 		Protected: prometheus.NewDesc(
 			"github_repo_branch_protected",
-			"Aasdadasdasd",
+			"Show if this branch is protected",
 			labels,
 			nil,
 		),
 		TotalCommits: prometheus.NewDesc(
 			"github_repo_branch_total_commits",
-			"Aasdadasdasd",
+			"Show how many commits this branch has since monitoring started",
 			labels,
 			nil,
 		),
@@ -70,14 +70,13 @@ func (c *BranchCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.TotalCommits
 }
 
-var TotalCommitsMap map[string]int
-
-// branch name
-// commit timestamp
-// count
+var TotalCommitsMap = make(map[string]int)
+var LastCommitSHAMap = make(map[string]string)
 
 // Collect is called by the Prometheus registry when collecting metrics.
 func (c *BranchCollector) Collect(ch chan<- prometheus.Metric) {
+	c.logger.Debug("test")
+
 	for _, name := range c.config.Repos.Value() {
 		n := strings.Split(name, "/")
 
@@ -130,19 +129,35 @@ func (c *BranchCollector) Collect(ch chan<- prometheus.Metric) {
 
 			for _, branch := range branches {
 
+				c.logger.Debug("Branch for")
 				key := fmt.Sprintf("%s-%s", repo, branch.GetName())
+				c.logger.Debug("Set key " + key)
+				c.logger.Debug(*branch.Commit.SHA)
 
-				if val, ok := TotalCommitsMap[key]; ok && val == *branch.Commit.Stats.Total {
-					// No change, do nothing
-					continue
+				if _, ok := TotalCommitsMap[key]; !ok {
+					TotalCommitsMap[key] = 0
+					LastCommitSHAMap[key] = *branch.Commit.SHA
+					c.logger.Debug("Initialized TotalCommits and LastCommitSHA for " + key)
 				}
-				TotalCommitsMap[key] = *branch.Commit.Stats.Total
+
+				if LastCommitSHAMap[key] != *branch.Commit.SHA {
+
+					totalCommits, err := getCommitsBetweenSHAs(ctx, c.client, owner, repo, LastCommitSHAMap[key], *branch.Commit.SHA)
+					if err != nil {
+						c.logger.Error("Failed to fetch Commits between SHAs",
+							"old SHA", LastCommitSHAMap[key],
+							"err", err,
+						)
+					}
+
+					LastCommitSHAMap[key] = *branch.Commit.SHA
+					TotalCommitsMap[key] = TotalCommitsMap[key] + totalCommits
+				}
 
 				labels := []string{
 					owner,
 					record.GetName(),
 					branch.GetName(),
-					string(rune(TotalCommitsMap[key])),
 				}
 
 				ch <- prometheus.MustNewConstMetric(
